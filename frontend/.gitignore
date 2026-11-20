@@ -1,0 +1,161 @@
+
+# ==========================================
+# DEPENDENCIES
+# ==========================================
+
+node_modules/
+.pnp/
+.pnp.js
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# ==========================================
+# BUILD OUTPUTS
+# ==========================================
+
+dist/
+dist-ssr/
+build/
+out/
+.next/
+.nuxt/
+.output/
+.vercel/
+.netlify/
+
+# Vite
+.vite/
+
+# ==========================================
+# LOGS
+# ==========================================
+
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+vite-debug.log*
+
+# ==========================================
+# ENVIRONMENT VARIABLES
+# ==========================================
+
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+# ==========================================
+# LOCAL CONFIGURATION
+# ==========================================
+
+*.local
+*.local.*
+!.env.example
+
+# ==========================================
+# TESTING & COVERAGE
+# ==========================================
+
+coverage/
+.nyc_output/
+*.lcov
+playwright-report/
+test-results/
+cypress/videos/
+cypress/screenshots/
+
+# ==========================================
+# TYPESCRIPT
+# ==========================================
+
+*.tsbuildinfo
+
+# ==========================================
+# EDITORS & IDEs
+# ==========================================
+
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.code-workspace
+
+# ==========================================
+# OPERATING SYSTEM FILES
+# ==========================================
+
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+
+# ==========================================
+# TEMPORARY FILES
+# ==========================================
+
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+
+# ==========================================
+# PACKAGE MANAGER TEMPORARY FILES
+# ==========================================
+
+.npm/
+.pnpm-store/
+
+# ==========================================
+# REACT / FRAMEWORK SPECIFIC
+# ==========================================
+
+# Storybook
+storybook-static/
+
+# Gatsby
+.cache/
+public/
+
+# Remix
+.cache/
+
+# Astro
+.astro/
+
+# ==========================================
+# DEPLOYMENT
+# ==========================================
+
+.vercel/
+.netlify/
+.firebase/
+
+# ==========================================
+# GENERATED FILES
+# ==========================================
+
+generated/
