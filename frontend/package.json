@@ -22,6 +22,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@marsidev/react-turnstile": "^1.6.3",
     "i18next": "^26.3.6",
     "lucide-react": "^1.28.0",
     "react": "^19.2.8",

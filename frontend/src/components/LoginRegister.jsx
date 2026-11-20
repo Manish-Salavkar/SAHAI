@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ShieldCheck, User, Lock, Mail, ArrowRight, AlertCircle, BadgeCheck, Briefcase, Building } from 'lucide-react';
-import { apiFetch } from '../utils/api'; // Added import
+import { Turnstile } from '@marsidev/react-turnstile';
+import { apiFetch } from '../utils/api';
 
 export default function LoginRegister({ onAuthSuccess }) {
   const { t } = useTranslation();
@@ -14,13 +15,45 @@ export default function LoginRegister({ onAuthSuccess }) {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('officer');
   const [department, setDepartment] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState('');
   
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const turnstileRef = useRef(null);
+  const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+
+  const resetTurnstile = () => {
+    setTurnstileToken('');
+    turnstileRef.current?.reset();
+  };
+
+  const handleDemoLogin = () => {
+    // Pull demo credentials from environment variables, fallback to defaults if missing
+    const demoId = import.meta.env.VITE_DEMO_ADMIN_ID || 'ADMIN-001';
+    const demoPassword = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'admin123';
+
+    setEmployeeId(demoId);
+    setPassword(demoPassword);
+    setIsLogin(true);
+    setError('');
+    
+    // Auto-submit after a brief delay so evaluators see the fields populate
+    setTimeout(() => {
+      const submitBtn = document.getElementById('login-form-submit');
+      if (submitBtn) submitBtn.click();
+    }, 400);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (siteKey && !turnstileToken) {
+      setError(t('auth.botError', 'Please complete the security check.'));
+      return;
+    }
+
     setLoading(true);
 
     const endpoint = isLogin ? '/auth/login' : '/auth/register';
@@ -29,7 +62,8 @@ export default function LoginRegister({ onAuthSuccess }) {
     const payload = isLogin
       ? { 
           employee_id: employeeId, 
-          password: password 
+          password: password,
+          turnstile_token: turnstileToken,
         }
       : { 
           employee_id: employeeId, 
@@ -37,18 +71,17 @@ export default function LoginRegister({ onAuthSuccess }) {
           email: email, 
           password: password,
           role: role,
-          department: department || null
+          department: department || null,
+          turnstile_token: turnstileToken,
         };
 
     try {
-      // Swapped standard fetch for apiFetch
       const response = await apiFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
-      // apiFetch returns null if it intercepts a 401 and redirects
       if (!response) {
         throw new Error(t('auth.authFailed', 'Authentication failed. Please check your credentials.'));
       }
@@ -56,7 +89,6 @@ export default function LoginRegister({ onAuthSuccess }) {
       const data = await response.json();
 
       if (!response.ok) {
-        // If 422 occurs, FastAPI returns an array of detail objects. We map it to a readable string.
         if (response.status === 422) {
           throw new Error(t('auth.validationError', 'Validation Error: Please check your input fields.'));
         }
@@ -65,15 +97,17 @@ export default function LoginRegister({ onAuthSuccess }) {
 
       if (isLogin) {
         localStorage.setItem('token', data.access_token);
-        localStorage.setItem('username', data.user.full_name); // Save full_name for the UI
+        localStorage.setItem('username', data.user.full_name); 
         localStorage.setItem('userRole', data.user.role);
         onAuthSuccess(data.user.full_name, data.user.role);
       } else {
+        resetTurnstile();
         setIsLogin(true);
         setError('');
         alert(t('auth.accountCreated', 'Account created successfully! Please sign in.'));
       }
     } catch (err) {
+      resetTurnstile();
       setError(err.message);
     } finally {
       setLoading(false);
@@ -171,7 +205,7 @@ export default function LoginRegister({ onAuthSuccess }) {
                   </div>
                 </div>
 
-                {/* Role Dropdown (Officer, Reviewer, Translator) */}
+                {/* Role Dropdown */}
                 <div className="form-group">
                   <label>{t('auth.role', 'Role')}</label>
                   <div className="input-icon-wrapper">
@@ -189,7 +223,7 @@ export default function LoginRegister({ onAuthSuccess }) {
                   </div>
                 </div>
 
-                {/* Department Text Field */}
+                {/* Department */}
                 <div className="form-group">
                   <label>{t('auth.department', 'Department')}</label>
                   <div className="input-icon-wrapper">
@@ -223,7 +257,27 @@ export default function LoginRegister({ onAuthSuccess }) {
               </div>
             </div>
 
-            <button type="submit" disabled={loading} className="btn-primary">
+            {siteKey && (
+              <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}>
+                <Turnstile
+                  ref={turnstileRef}
+                  siteKey={siteKey}
+                  onSuccess={(token) => {
+                    setTurnstileToken(token);
+                    setError('');
+                  }}
+                  onExpire={() => setTurnstileToken('')}
+                  onError={() => setTurnstileToken('')}
+                />
+              </div>
+            )}
+
+            <button 
+              id="login-form-submit" 
+              type="submit" 
+              disabled={loading} 
+              className="btn-primary"
+            >
               {loading ? t('auth.processing', 'Processing...') : (
                 <>
                   {isLogin ? t('auth.signInBtn', 'Sign In') : t('auth.registerBtn', 'Register Account')}
@@ -231,13 +285,40 @@ export default function LoginRegister({ onAuthSuccess }) {
                 </>
               )}
             </button>
+            
+            {/* Quick Demo Access Button */}
+            {isLogin && (
+              <button 
+                type="button" 
+                onClick={handleDemoLogin} 
+                className="btn-secondary"
+                disabled={loading}
+                style={{ 
+                  width: '100%', 
+                  marginTop: '0.75rem', 
+                  backgroundColor: '#f1f5f9', 
+                  color: '#334155', 
+                  border: '1px solid #cbd5e1',
+                  padding: '0.75rem',
+                  borderRadius: '6px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Login as Demo Admin
+              </button>
+            )}
           </form>
 
           <div className="auth-footer">
             {isLogin ? t('auth.noAccount', "Don't have an account?") : t('auth.hasAccount', 'Already registered?')}
             <button
               type="button"
-              onClick={() => { setIsLogin(!isLogin); setError(''); }}
+              onClick={() => {
+                resetTurnstile();
+                setIsLogin(!isLogin);
+                setError('');
+              }}
               className="auth-link"
             >
               {isLogin ? t('auth.createOne', 'Create one now') : t('auth.signInBtn', 'Sign In')}

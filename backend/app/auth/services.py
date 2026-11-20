@@ -17,10 +17,12 @@ from app.auth.utils import (
 )
 from app.config import SECRET_KEY, TOKENALGORITHM
 from app.database import get_db
-
+import httpx
+import os
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
+TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 
 # ------------------------------------------------------------------------------
 # Current User
@@ -89,6 +91,7 @@ async def authenticate_user(
     db: AsyncSession,
     credentials: LoginInput,
 ):
+    await verify_turnstile(credentials.turnstile_token)
 
     user = (
         await db.execute(
@@ -156,6 +159,7 @@ async def create_user_service(
     db: AsyncSession,
     user: CreateUser,
 ):
+    await verify_turnstile(user.turnstile_token)
 
     existing = (
         await db.execute(
@@ -305,7 +309,11 @@ async def toggle_user_status_service(
 # =====================================================================
 
 async def get_all_users_service(db: AsyncSession):
-    result = await db.execute(select(User).order_by(User.id.desc()))
+    result = await db.execute(
+        select(User)
+        .where(User.role != "admin")
+        .order_by(User.id.desc())
+    )
     users = result.scalars().all()
     return [UserOut.model_validate(u) for u in users]
 
@@ -315,16 +323,23 @@ async def approve_user_service(db: AsyncSession, user_id: int, is_approved: bool
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
+    # Prevent modifying the master admin
+    if user.role == "admin":
+        raise HTTPException(status_code=403, detail="Cannot modify system administrator access.")
+    
     user.is_approved = is_approved
     await db.flush()
     await db.refresh(user)
     return {"message": "User approval status updated", "data": UserOut.model_validate(user)}
 
-
 async def update_user_role_service(db: AsyncSession, user_id: int, role: str):
     user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    # Prevent modifying the master admin
+    if user.role == "admin":
+        raise HTTPException(status_code=403, detail="Cannot alter system administrator role.")
     
     user.role = role
     await db.flush()
@@ -420,6 +435,33 @@ async def seed_initial_admin_service(db: AsyncSession):
         )
         db.add(admin_user)
         await db.commit()
+
+
+async def verify_turnstile(token: str, remote_ip: str | None = None):
+    secret = os.getenv("TURNSTILE_SECRET_KEY")
+    if not secret:
+        raise HTTPException(status_code=500, detail="Turnstile secret is not configured")
+
+    if not token:
+        raise HTTPException(status_code=400, detail="Missing Turnstile token")
+
+    payload = {"secret": secret, "response": token}
+    if remote_ip:
+        payload["remoteip"] = remote_ip
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(TURNSTILE_VERIFY_URL, data=payload)
+        resp.raise_for_status()
+        data = resp.json()
+
+    allowed_hosts = {
+        h.strip()
+        for h in os.getenv("TURNSTILE_ALLOWED_HOSTNAMES", "sahai.manishsalavkar.me").split(",")
+        if h.strip()
+    }
+
+    if not data.get("success") or (allowed_hosts and data.get("hostname") not in allowed_hosts):
+        raise HTTPException(status_code=403, detail="Turnstile verification failed")
 # =====================================================================
 # END OF BACKEND/APP CHANGE SEPARATOR
 # =====================================================================

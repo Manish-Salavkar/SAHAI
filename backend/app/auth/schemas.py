@@ -59,6 +59,7 @@ class CreateUser(UserBase):
         "reviewer",
         "translator"
     ] = "officer"
+    turnstile_token: str
 # =====================================================================
 # END OF BACKEND/APP CHANGE SEPARATOR
 # =====================================================================
@@ -112,7 +113,7 @@ class UserUpdate(BaseModel):
 class LoginInput(BaseModel):
     employee_id: str
     password: str
-
+    turnstile_token: str
 
 # ------------------------------------------------------------------------------
 # JWT Response

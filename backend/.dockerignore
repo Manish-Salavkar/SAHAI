@@ -1,0 +1,7 @@
+# backend/.dockerignore
+venv/
+venv_backup/
+__pycache__/
+maharashtra_gr_db_v2_backup/
+gr_files/
+*.db
